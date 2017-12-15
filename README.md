@@ -17,7 +17,8 @@ matrix files, as well as two sequences files: one with a single sequence, the ot
 
 ### Run this script
 
-Note: I use a maximal iterated number - the length of setX and a threshold of variation in the sum of log probabilities instead of [-c] argument.
+Note: I use a maximal iterated number - the length of setX and a threshold of variation in the sum of log probabilities instead of [-c] argument to avoid infinite loops.
+
 Usage: ` python3 MainProgram.py [-h] [-v] [-f] [-b] [-w] -am
                       transmission_matrix_file -em emission_matrix_file -s
                       sequence_file`
