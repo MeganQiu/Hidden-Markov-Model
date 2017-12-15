@@ -9,6 +9,9 @@ complete it.
 
 import AEMatrices
 from AEMatrices import A, E, allStates, emittingStates, emissionSymbols
+from BaumWelch import forward, getProbabilityForwardX
+import math
+from collections import Counter
 
 
 # viterbi algorithm takes a sequence X as input
@@ -95,3 +98,78 @@ def generateStateSeq(backTrace, x):
         pi[i-1] = backTrace[pi[i]][i]
     # return the state sequence
     return pi
+
+
+def viterbi_training(setX):
+    # do iterations and the maximal iteration is the length of training set.
+    iteration = 0
+    pre_sumLL = 0.0
+
+    while iteration <= len(setX):
+        # Initialise some useful list
+        state_paths = []
+        transition = []
+        emission = []
+        # Initialise the sum of probabilities.
+        sumLL = 0.0
+
+        for X in setX:
+            # get sum of log likelihood to judge convergence
+            L = len(X) - 2
+            f = forward(X, L)
+            for_prob = getProbabilityForwardX(f, L)
+            sumLL += math.log(for_prob)
+
+            # get optimal path by Viterbi algorithm
+            vi, backTrace, vi['E'][L + 1] = viterbi(X)
+            state_path = generateStateSeq(backTrace, X)
+            state_paths += state_path# store the path
+
+            # store the transition from state i to j.
+            transition += zip(state_path[:-1], state_path[1:])
+            # store the emission symbols with the state.
+            emission += zip(state_path[1:-1], X[:])
+
+        # count the frequencies of aij, ai and ekb.
+        count_state = Counter(state_paths)
+        count_symbol = Counter(emission)
+        count_transition = Counter(transition)
+
+        # calculate new emission matrix
+        newE = dict()
+        for k in emittingStates:
+            # initalise new emission matrix newE
+            newE[k] = dict()
+            for s in emissionSymbols:
+                    if count_state[k] == 0:
+                        newE[k][s] = 0
+                    else:
+                        newE[k][s] = count_symbol[(k, s)] / count_state[k]
+
+        # calculate new transition matrix
+        newA = dict()
+        for k in allStates:
+            # initialise new transition matrix newA
+            newA[k] = dict()
+            for l in allStates:
+                if count_state[k] == 0:
+                    newA[k][l] = 0
+                else:
+                    newA[k][l] = count_transition[(k, l)] / count_state[k]
+
+        # update the matrix to continue iteration.
+        A = AEMatrices.setNewA(newA)
+        E = AEMatrices.setNewE(newE)
+
+        ratio_of_change = math.fabs(sumLL - pre_sumLL) / math.fabs(sumLL)
+        pre_sumLL = sumLL
+
+        # determine whether the result converges or not.
+        if ratio_of_change <= 0.0001:
+            break
+        else:
+            iteration += 1
+
+    return(A, E, iteration)
+
+

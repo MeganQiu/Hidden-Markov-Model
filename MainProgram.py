@@ -34,7 +34,24 @@ def viterbiAlgorithm(seq, a, e):
 
 	# Print the most likely sequence path of x according to the viterbi algorithm
 	print('Most likely state is {0}, with probability of {1}'.format(''.join(Viterbi.generateStateSeq
-																			  (backTrace, setX[0])), probability))
+	                                                                         (backTrace, setX[0])), probability))
+
+def viterbiTraining(seq, a, e):
+	'''Run the Viterbi training and save new matrices in an output folder.
+	'''
+	# Read the A and E matrices
+	AEMatrices.init(e, a)
+
+	# Read the input sequences and store them into seqX.
+	seqX = Sequences.readSeq(seq, "X")
+
+	# Do Viterbi training using a training set of sequences.
+	newA, newE, iteration = Viterbi.viterbi_training(seqX)
+	# print new matrices in files.
+	AEMatrices.writeEMatrix(newE, 'output/newE.txt')
+	AEMatrices.writeAMatrix(newA, 'output/newA.txt')
+	# print the iteration number
+	print(iteration)
 
 
 def forwardAlgorithm(seq, a, e):
@@ -49,7 +66,7 @@ def forwardAlgorithm(seq, a, e):
 	f = BaumWelch.forward(setX[0], len(setX[0]) - 2)
 	AEMatrices.writeForwardMatrix(f, 'output/forward_matrix.txt')
 	print('\nForward probability for sequence {0}:\n{1}'.format(''.join(setX[0]).strip(),
-															  BaumWelch.getProbabilityForwardX(f, len(setX[0]) - 2)))
+	                                                            BaumWelch.getProbabilityForwardX(f, len(setX[0]) - 2)))
 
 
 def backwardAlgorithm(seq, a, e):
@@ -74,7 +91,14 @@ def baum_welchAlgorithm(seq, a, e, convergence):
 	# Read the input sequence(s) and store them into setX
 	setX = Sequences.readSeq(seq, "X")
 
-	w = BaumWelch.baumWelch(setX, convergence)
+	newA, newE, iteration, delta_sumLL = BaumWelch.baumWelch(setX, convergence)
+	# print new matrices in files.
+	AEMatrices.writeEMatrix(newE, 'output/newE.txt')
+	AEMatrices.writeAMatrix(newA, 'output/newA.txt')
+	print(iteration, delta_sumLL)
+
+
+
 
 
 def parser():
@@ -95,6 +119,7 @@ def parser():
 						help='[-em] to select emission matrixfile ')
 	parser.add_argument('-s', required=True, metavar='sequence_file', dest='sequence',
 						help='[-s] to select sequence file')
+	parser.add_argument('-t', dest='viterbiTraining', action='store_true', help='[-t] to run the viterbi training')
 
 
 	arguments = parser.parse_args()  # takes the arguments
@@ -107,6 +132,8 @@ def parser():
 		algorithm = 'backward'
 	elif arguments.baum_welch == True:  # Do the Baum-Welch algorithm
 		algorithm = 'baum_welch'
+	elif arguments.viterbiTraining == True: # Do the Viterbi training
+		algorithm = 'viterbiTraining'
 
 	# Kept here just in case
 	else:
@@ -138,7 +165,8 @@ def main():
 		backwardAlgorithm(input_sequence, a_matrix, e_matrix)
 	elif algorithm == 'baum_welch':
 		baum_welchAlgorithm(input_sequence, a_matrix, e_matrix, args.convergence)
-
+	elif algorithm == 'viterbiTraining':
+		viterbiTraining(input_sequence, a_matrix, e_matrix)
 
 if __name__ == "__main__":
 	main()

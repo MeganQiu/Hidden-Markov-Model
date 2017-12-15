@@ -3,6 +3,7 @@
 
 import AEMatrices
 from AEMatrices import A, E, allStates, emittingStates, emissionSymbols
+import math
 
 # Forward algorithm, takes a sequence X and the nr. of symbols in of the sequence (L) as inputs
 # It uses  A, E, allStates, emittingStates, emissionSymbols from AEMatrices
@@ -68,7 +69,7 @@ def backward(X, L):
 
 	# calculate probability
 	for l in emittingStates:
-		b["B"][0] += b[l][1] * A["B"][l] 
+		b["B"][0] += b[l][1] * A["B"][l]
 
 	# return backward matrix
 	return b
@@ -137,89 +138,112 @@ def baumWelch(setX, conv):
 	# initialise emission counts matrix
 	# eC[k][s] is the expected number of counts for emission symbol s
 	# at state k
-	eC = dict()
-	for k in allStates:
-		eC[k] = dict()
-		for s in emissionSymbols:
-			# you may want to add pseudo counts here
-			eC[k][s] = 0;
+	iteration = 1
+	VARIATION = 0.0001
+	# set previous sumLL to do iterations
+	pre_sumLL = 0.0
 
-	# initials transition count matrix
-	# aC[k][l] is the expected number of transitions from
-	# state k to state l
-	aC = dict()
-	for k in allStates:
-		aC[k] = dict()
-		for l in allStates:
-			# you may want to add pseudo counts here
-			aC[k][l] = 0;
-	# sum over log likelihood
-	sumLL = 0.0
+	while iteration <= len(setX):
 
-	# iterate over training sequences
-	for X in setX:
-		L = len(X) - 2
+		eC = dict()
+		for k in emittingStates:
+			eC[k] = dict()
+			for s in emissionSymbols:
+				# you may want to add pseudo counts here
+				eC[k][s] = 0
+
+		# initials transition count matrix
+		# aC[k][l] is the expected number of transitions from
+		# state k to state l
+		aC = dict()
+		for k in allStates:
+			aC[k] = dict()
+			for l in allStates:
+				# you may want to add pseudo counts here
+				aC[k][l] = 0
+		# sum over log likelihood
+		sumLL = 0.0
+
+		# iterate over training sequences
+		for X in setX:
+			L = len(X) - 2
+			f = forward(X, L)
+			b = backward(X, L)
+			# probability P(x)
+			prob = getProbabilityForwardX(f, L)
+			# the emission probability of symbol s from state k given the training sequence X
+			eP = emissionP(f, b, X, L)
+			# add emission counts
+			for k in emittingStates:
+
+				for s in emissionSymbols:
+					eC[k][s] += (1 / prob) * eP[k][s]
+
+			# the transition probability from state k to state l given the training sequence X
+			aP = transitionP(f, b, X, L)
+			# add transition counts
+			for k in allStates:
+
+				for l in allStates:
+					aC[k][l] += (1 / prob) * aP[k][l]
 
 
-	#############################
-	### INSERT YOUR CODE HERE ###
-	#############################
+			# add sum over log likelihood
+			sumLL += math.log(prob)
 
-	### you may use the following functions defined above:
-	### forward, backward, getProbabilityX, emissionP, transitionP
-	### here you should calculate eC and aC,
-	### the matrices for the number of expected counts
-	### also calculate your sumLL, the sum over the logodds
-	### of all the sequences in the training set.
+		# calculate new transitions
+		# initialisie new transition matrix newA
+		newA = dict()
+		for k in allStates:
+			newA[k] = dict()
+			sum_l = 0
 
-	# add emission counts
+			for l in allStates:
+				sum_l += aC[k][l]
 
-	# add transition counts
+			for l in allStates:
+				if sum_l != 0:
+					newA[k][l] = aC[k][l] / sum_l
+				else:
+					newA[k][l] = 0
 
-	# add sum over log likelihood
+		# calculate new emissions
+		# initialise new emission matrix newE
+		newE = dict()
+		for k in emittingStates:
+			newE[k] = dict()
+			sum_s = 0
 
-	##########################
-	### END YOUR CODE HERE ###
-	##########################
+			for s in emissionSymbols:
+				sum_s += eC[k][s]
 
-	# finish iteration
+			for s in emissionSymbols:
+				if sum_s != 0:
+					newE[k][s] = eC[k][s] / sum_s
+				else:
+					newE[k][s] = 0
 
-	# calculate new transitions
-	# initialisie new transition matrix newA
-	newA = dict()
-	for k in allStates:
-		newA[k] = dict()
-		sum_l = 0
+		# update the A and E matrices
+		A = AEMatrices.setNewA(newA)
+		E = AEMatrices.setNewE(newE)
 
-	#############################
-	### INSERT YOUR CODE HERE ###
-	#############################
+		# if there is only one training sequence, do one iteration.
+		if len(setX) == 1:
+			break
 
-	### here you should calculate your new transition
-	### matrix newA
+		# get sumLL differences
+		delta_sumLL = math.fabs( pre_sumLL - sumLL ) / math.fabs( sumLL )
+		# update previous sumLL
+		pre_sumLL = sumLL
 
-	##########################
-	### END YOUR CODE HERE ###
-	##########################
+		# check if it converges.
+		if delta_sumLL <= VARIATION:
+			break
+		else:
+			# update iteration
+			iteration += 1
 
-	# calculate new emissions
-	# initialise new emission matrix newE
-	newE = dict()
-	for k in emittingStates:
-		newE[k] = dict()
-		sum_s = 0
+	return (A, E, iteration, delta_sumLL)
 
-		#############################
-		### INSERT YOUR CODE HERE ###
-		#############################
-
-		### here you should calculate your new emission
-		### matrix newE
-
-		##########################
-		### END YOUR CODE HERE ###
-		##########################
-
-	return (newA, newE, sumLL)
 
 # finish BaumWelch
